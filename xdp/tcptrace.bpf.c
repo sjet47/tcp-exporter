@@ -141,7 +141,7 @@ static __always_inline bool build_key(void* start,
     bpf_printk("tcptrace: capture pkt[%u -> %u]", ip4hdr->saddr, ip4hdr->daddr);
 #endif
     key->src_ip = remap_ipv4(ip4hdr->saddr);
-    key->dst_ip = remap_ipv4(ip4hdr->daddr);
+    key->dst_ip = ip4hdr->daddr;
     return true;
   }
   return false;

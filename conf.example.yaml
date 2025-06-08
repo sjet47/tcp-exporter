@@ -1,0 +1,8 @@
+nic: eno2
+load_mode: skb
+metrics_addr: ":8080"
+mapping:
+  192.168.5.51:
+    - "192.168.5.50/32"
+capture:
+  192.168.5.50/32: 0

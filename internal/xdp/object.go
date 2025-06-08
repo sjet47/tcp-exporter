@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"tcp-exporter/internal/conf"
+
+	"github.com/sjet47/tcp-exporter/internal/conf"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"

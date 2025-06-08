@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"tcp-exporter/internal/conf"
-	"tcp-exporter/internal/prom"
-	"tcp-exporter/internal/xdp"
+
+	"github.com/sjet47/tcp-exporter/internal/conf"
+	"github.com/sjet47/tcp-exporter/internal/prom"
+	"github.com/sjet47/tcp-exporter/internal/xdp"
 
 	"gopkg.in/yaml.v3"
 )

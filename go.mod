@@ -1,4 +1,4 @@
-module tcp-exporter
+module github.com/sjet47/tcp-exporter
 
 go 1.24.4
 

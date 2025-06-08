@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"tcp-exporter/internal/xdp"
+
+	"github.com/sjet47/tcp-exporter/internal/xdp"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"

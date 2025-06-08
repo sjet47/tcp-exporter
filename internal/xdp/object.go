@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"tcptrace/internal/conf"
+	"tcp-exporter/internal/conf"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"

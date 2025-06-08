@@ -1,4 +1,4 @@
-module tcptrace
+module tcp-exporter
 
 go 1.24.4
 

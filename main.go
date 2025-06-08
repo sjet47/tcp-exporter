@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"tcptrace/internal/conf"
-	"tcptrace/internal/prom"
-	"tcptrace/internal/xdp"
+	"tcp-exporter/internal/conf"
+	"tcp-exporter/internal/prom"
+	"tcp-exporter/internal/xdp"
 
 	"gopkg.in/yaml.v3"
 )

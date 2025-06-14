@@ -8,15 +8,15 @@
 char _license[] SEC("license") = "GPL";
 
 struct ipv4_cidr_key {
-  __u32 prefixlen;  // CIDR prefix
-  __u32 data;       // IPv4 network
+  __u32 prefix_len;  // CIDR prefix
+  __be32 addr;       // IPv4 network
 };
 
 // IPv4 Remapping config
 struct {
   __uint(type, BPF_MAP_TYPE_LPM_TRIE);
   __type(key, struct ipv4_cidr_key);
-  __type(value, __u32);  // remapped IPv4 address
+  __type(value, __be32);  // remapped IPv4 address
   __uint(map_flags, BPF_F_NO_PREALLOC);
   __uint(max_entries, 256);
 #ifdef PIN_MAP
@@ -26,20 +26,19 @@ struct {
 
 // Filter config
 struct {
-  __uint(type, BPF_MAP_TYPE_LPM_TRIE);
-  __type(key, struct ipv4_cidr_key);
-  __type(value, __be16);  // port
-  __uint(map_flags, BPF_F_NO_PREALLOC);
-  __uint(max_entries, 256);
+  __uint(type, BPF_MAP_TYPE_ARRAY);
+  __type(key, __u32);   // index(port)
+  __type(value, __u8);  // bool
+  __uint(max_entries, 65536);
 #ifdef PIN_MAP
   __uint(pinning, LIBBPF_PIN_BY_NAME);  // Pin map to bpffs
 #endif
-} ipv4_capture_cfg SEC(".maps");
+} capture_cfg SEC(".maps");
 
 // Traffic statistics
 struct traffic_direction {
-  __u32 src_ip;
-  __u32 dst_ip;
+  __be32 src_ip;
+  __u32 dst_port;
 };
 
 struct count_value {
@@ -48,15 +47,16 @@ struct count_value {
 };
 
 struct {
-  __uint(type, BPF_MAP_TYPE_PERCPU_HASH);
+  __uint(type, BPF_MAP_TYPE_HASH);
   __type(key, struct traffic_direction);
   __type(value, struct count_value);
   __uint(map_flags, BPF_F_NO_PREALLOC);
-  __uint(max_entries, 256);
+  __uint(max_entries, 1024);
 } traffic_stats SEC(".maps");
 
 // Increase the statistics of a map by one packet
-static __always_inline void count_pkt(const void* key, __u64 value) {
+static __always_inline void count_pkt(const struct traffic_direction* key,
+                                      __u64 value) {
   void* map = &traffic_stats;
   struct count_value* cnt = bpf_map_lookup_elem(map, key);
   if (NULL != cnt) {
@@ -69,8 +69,8 @@ static __always_inline void count_pkt(const void* key, __u64 value) {
 }
 
 // Remap IPv4 address using the remap configuration
-static __always_inline __u32 remap_ipv4(__u32 ipaddr) {
-  struct ipv4_cidr_key key = {.prefixlen = 32, .data = ipaddr};
+static __always_inline __be32 remap_ipv4(__be32 ipaddr) {
+  struct ipv4_cidr_key key = {.prefix_len = 32, .addr = ipaddr};
   __u32* remapped_ip = bpf_map_lookup_elem(&ipv4_remap_cfg, &key);
   if (NULL == remapped_ip) {
     return ipaddr;  // No remapping found, return original IP
@@ -79,14 +79,12 @@ static __always_inline __u32 remap_ipv4(__u32 ipaddr) {
 }
 
 // Check if the packet should be captured based on the configuration
-static __always_inline bool capture(__u32 ipaddr, __be16 port) {
-  struct ipv4_cidr_key key = {.prefixlen = 32, .data = ipaddr};
-  __be16* capture_port = bpf_map_lookup_elem(&ipv4_capture_cfg, &key);
-  if (NULL == capture_port) {
+static __always_inline bool capture(__u32 index) {
+  __u8* capture = bpf_map_lookup_elem(&capture_cfg, &index);
+  if (NULL == capture) {
     return false;
   }
-  __be16 cp = *capture_port;
-  return cp == 0 || cp == port;
+  return *capture == 1;
 }
 
 static __always_inline bool build_key(void* start,
@@ -135,13 +133,18 @@ static __always_inline bool build_key(void* start,
     return false;
   }
 
-  if (capture(ip4hdr->daddr, tcphdr->dest) ||
-      capture(ip4hdr->saddr, tcphdr->source)) {
+  __u32 port_index = (__u32)bpf_ntohs(tcphdr->dest);
+  if (capture(port_index)) {
 #ifdef DEBUG
-    bpf_printk("tcptrace: capture pkt[%u -> %u]", ip4hdr->saddr, ip4hdr->daddr);
+    bpf_printk("tcptrace: capture pkt[%u.%u.%u.%u:%u -> %u.%u.%u.%u:%u]",
+               (ip4hdr->saddr >> 0) & 0xff, (ip4hdr->saddr >> 8) & 0xff,
+               (ip4hdr->saddr >> 16) & 0xff, (ip4hdr->saddr >> 24) & 0xff,
+               bpf_ntohs(tcphdr->source), (ip4hdr->daddr >> 0) & 0xff,
+               (ip4hdr->daddr >> 8) & 0xff, (ip4hdr->daddr >> 16) & 0xff,
+               (ip4hdr->daddr >> 24) & 0xff, bpf_ntohs(tcphdr->dest));
 #endif
     key->src_ip = remap_ipv4(ip4hdr->saddr);
-    key->dst_ip = ip4hdr->daddr;
+    key->dst_port = port_index;
     return true;
   }
   return false;

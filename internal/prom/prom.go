@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strconv"
 
 	"github.com/sjet47/tcp-exporter/internal/xdp"
 
@@ -22,7 +23,7 @@ func MetricsHandler(x *xdp.XDP) http.Handler {
 			Name: "tcptrace_packets_total",
 			Help: "Total number of packets observed by XDP program",
 		},
-		[]string{"direction", "peer"},
+		[]string{"src_ip", "dst_port"},
 	)
 
 	// Create byte count metric
@@ -31,7 +32,7 @@ func MetricsHandler(x *xdp.XDP) http.Handler {
 			Name: "tcptrace_bytes_total",
 			Help: "Total number of bytes observed by XDP program",
 		},
-		[]string{"direction", "peer"},
+		[]string{"src_ip", "dst_port"},
 	)
 
 	registry.MustRegister(packetCounter)
@@ -54,10 +55,10 @@ func MetricsHandler(x *xdp.XDP) http.Handler {
 
 		// Convert traffic statistics to Prometheus metrics
 		for key, value := range countMap {
-			direction := "inbound" // XDP program can only observe inbound traffic
-			peer := net.IP(key.SrcIP[:]).String()
-			packetCounter.WithLabelValues(direction, peer).Add(float64(value.PktCnt))
-			byteCounter.WithLabelValues(direction, peer).Add(float64(value.ByteCnt))
+			srcIP := net.IP(key.SrcIP[:]).String()
+			dstPort := strconv.Itoa(int(key.DstPort))
+			packetCounter.WithLabelValues(srcIP, dstPort).Add(float64(value.PktCnt))
+			byteCounter.WithLabelValues(srcIP, dstPort).Add(float64(value.ByteCnt))
 		}
 
 		// Serve the metrics

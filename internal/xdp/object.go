@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log"
 	"net"
 
 	"github.com/sjet47/tcp-exporter/internal/conf"
@@ -21,7 +22,7 @@ const (
 type xdpObj struct {
 	Prog         *ebpf.Program `ebpf:"tcptrace"`
 	RemapCfg     *ebpf.Map     `ebpf:"ipv4_remap_cfg"`
-	CaptureCfg   *ebpf.Map     `ebpf:"ipv4_capture_cfg"`
+	CaptureCfg   *ebpf.Map     `ebpf:"capture_cfg"`
 	TrafficStats *ebpf.Map     `ebpf:"traffic_stats"`
 }
 
@@ -38,7 +39,10 @@ type XDP struct {
 	spec    *ebpf.CollectionSpec
 	linkOpt link.XDPOptions
 
-	l link.Link
+	l          link.Link
+	remapMap   *Map
+	captureMap *Map
+	statsMap   *Map
 }
 
 func (x *XDP) Attach() error {
@@ -56,7 +60,7 @@ func (x *XDP) Attach() error {
 }
 
 func (x *XDP) CountMap() (map[TrafficKey]CountValue, error) {
-	return ReadCountMap(x.obj.TrafficStats, TrafficKeyParser, CountValueParser)
+	return ReadMergeMap(x.statsMap, trafficKey, countValue)
 }
 
 func (x *XDP) Close() {
@@ -71,17 +75,19 @@ func (x *XDP) loadConfigMap(cfg *conf.Conf) error {
 			return fmt.Errorf("invalid mapped IP address %q in mapping", addr)
 		}
 		for _, cidr := range cidrs {
-			if err := remapSpec.PutCidrEntry(x.obj.RemapCfg, cidr, ip.To4()); err != nil {
+			if err := x.remapMap.PutCidrEntry(cidr, ip.To4()); err != nil {
 				return fmt.Errorf("put remap entry for %s:%s error: %v", cidr, ip, err)
 			}
 		}
 	}
 
-	for ip, port := range cfg.Capture {
-		portBytes := make([]byte, 2)
-		binary.LittleEndian.PutUint16(portBytes, port)
-		if err := captureSpec.PutCidrEntry(x.obj.CaptureCfg, ip, portBytes); err != nil {
-			return fmt.Errorf("put capture entry for %s:%d error: %v", ip, port, err)
+	for _, port := range cfg.Capture {
+		log.Printf("load port %d", port)
+		portBytes := make([]byte, 4)
+		// port here is actually array index, so use native endian
+		binary.NativeEndian.PutUint32(portBytes, port)
+		if err := x.captureMap.PutEntry(portBytes, []byte{byte(1)}); err != nil {
+			return fmt.Errorf("put capture entry for %d error: %v", port, err)
 		}
 	}
 
@@ -116,12 +122,19 @@ func Load(prog io.ReaderAt, cfg *conf.Conf) (*XDP, error) {
 		flag = 0
 	}
 
-	if err := remapSpec.CheckMap(obj.RemapCfg); err != nil {
+	remapMap, err := remapSpec.WithMap(obj.RemapCfg)
+	if err != nil {
 		return nil, fmt.Errorf("check remap map error: %v", err)
 	}
 
-	if err := captureSpec.CheckMap(obj.CaptureCfg); err != nil {
+	captureMap, err := captureSpec.WithMap(obj.CaptureCfg)
+	if err != nil {
 		return nil, fmt.Errorf("check capture map error: %v", err)
+	}
+
+	statsMap, err := statsSpec.WithMap(obj.TrafficStats)
+	if err != nil {
+		return nil, fmt.Errorf("check traffic_stats map error: %v", err)
 	}
 
 	return &XDP{
@@ -133,5 +146,9 @@ func Load(prog io.ReaderAt, cfg *conf.Conf) (*XDP, error) {
 			Interface: iface.Index,
 			Flags:     flag,
 		},
+
+		remapMap:   remapMap,
+		captureMap: captureMap,
+		statsMap:   statsMap,
 	}, nil
 }

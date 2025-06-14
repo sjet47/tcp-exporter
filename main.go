@@ -15,7 +15,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const versionInfo = "tcp-exporter v0.3.1"
+const versionInfo = "tcp-exporter v0.3.2"
 
 var (
 	configPath string

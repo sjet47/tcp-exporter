@@ -18,7 +18,7 @@ struct {
   __type(key, struct ipv4_cidr_key);
   __type(value, __be32);  // remapped IPv4 address
   __uint(map_flags, BPF_F_NO_PREALLOC);
-  __uint(max_entries, 256);
+  __uint(max_entries, 1024);
 #ifdef PIN_MAP
   __uint(pinning, LIBBPF_PIN_BY_NAME);  // Pin map to bpffs
 #endif
@@ -51,7 +51,7 @@ struct {
   __type(key, struct traffic_direction);
   __type(value, struct count_value);
   __uint(map_flags, BPF_F_NO_PREALLOC);
-  __uint(max_entries, 1024);
+  __uint(max_entries, 65536);
 } traffic_stats SEC(".maps");
 
 // Increase the statistics of a map by one packet

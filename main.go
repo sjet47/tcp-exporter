@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	_ "embed"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -14,17 +15,50 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const versionInfo = "tcp-exporter v0.3.1"
+
+var (
+	configPath string
+	genConfig  bool
+	version    bool
+)
+
+func init() {
+	// Set up logging
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
+	flag.StringVar(&configPath, "c", "", "yaml configuration file path")
+	flag.BoolVar(&genConfig, "gen", false, "generate default configuration file")
+	flag.BoolVar(&version, "v", false, "print version information and exit")
+}
+
 //go:generate make -C ./xdp tcptrace.o
 //go:embed xdp/tcptrace.o
 var tcptraceProg []byte
 
 func main() {
-	if len(os.Args) != 2 {
-		fmt.Fprintf(os.Stderr, "Usage: %s <config.yaml>\n", os.Args[0])
-		os.Exit(1)
+	flag.Parse()
+
+	if version {
+		fmt.Fprintln(os.Stderr, versionInfo)
+		return
 	}
 
-	f, err := os.ReadFile(os.Args[1])
+	if genConfig {
+		defaultConf := conf.Default()
+		encoder := yaml.NewEncoder(os.Stdout)
+		if err := encoder.Encode(defaultConf); err != nil {
+			log.Fatalf("Failed to generate default config: %v", err)
+		}
+		return
+	}
+
+	if len(configPath) == 0 {
+		flag.Usage()
+		return
+	}
+
+	f, err := os.ReadFile(configPath)
 	if err != nil {
 		log.Fatalf("Failed to read config file: %v", err)
 	}

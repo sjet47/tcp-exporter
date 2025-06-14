@@ -15,12 +15,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const versionInfo = "tcp-exporter v0.3.2"
-
 var (
-	configPath string
-	genConfig  bool
-	version    bool
+	configPath  string
+	genConfig   bool
+	showVersion bool
 )
 
 func init() {
@@ -29,18 +27,21 @@ func init() {
 
 	flag.StringVar(&configPath, "c", "", "yaml configuration file path")
 	flag.BoolVar(&genConfig, "gen", false, "generate default configuration file")
-	flag.BoolVar(&version, "v", false, "print version information and exit")
+	flag.BoolVar(&showVersion, "v", false, "print version information and exit")
 }
 
 //go:generate make -C ./xdp tcptrace.o
 //go:embed xdp/tcptrace.o
 var tcptraceProg []byte
 
+//go:embed version
+var version string
+
 func main() {
 	flag.Parse()
 
-	if version {
-		fmt.Fprintln(os.Stderr, versionInfo)
+	if showVersion {
+		fmt.Fprintf(os.Stderr, "tcp-exporter %s\n", version)
 		return
 	}
 

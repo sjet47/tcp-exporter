@@ -30,7 +30,7 @@ func init() {
 	flag.BoolVar(&showVersion, "v", false, "print version information and exit")
 }
 
-//go:generate make -C ./xdp tcptrace.o
+//go:generate make CFLAGS='-DPER_CPU' -C ./xdp tcptrace.o
 //go:embed xdp/tcptrace.o
 var tcptraceProg []byte
 

@@ -47,7 +47,11 @@ struct count_value {
 };
 
 struct {
+#ifdef PER_CPU
   __uint(type, BPF_MAP_TYPE_PERCPU_HASH);
+#else
+  __uint(type, BPF_MAP_TYPE_HASH);
+#endif
   __type(key, struct traffic_direction);
   __type(value, struct count_value);
   __uint(map_flags, BPF_F_NO_PREALLOC);
@@ -60,8 +64,13 @@ static __always_inline void count_pkt(const struct traffic_direction* key,
   void* map = &traffic_stats;
   struct count_value* cnt = bpf_map_lookup_elem(map, key);
   if (NULL != cnt) {
+#ifdef PER_CPU
+    cnt->bytes += value;
+    cnt->pkts++;
+#else
     __sync_fetch_and_add(&cnt->bytes, value);
     __sync_fetch_and_add(&cnt->pkts, 1);
+#endif
   } else {
     struct count_value count = {.bytes = value, .pkts = 1};
     bpf_map_update_elem(map, key, &count, BPF_NOEXIST);

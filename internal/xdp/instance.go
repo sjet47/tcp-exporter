@@ -20,7 +20,7 @@ var (
 	}
 
 	statsSpec = MapSpec{
-		Type:      ebpf.Hash,
+		Type:      ebpf.PerCPUHash,
 		KeySize:   8,  // src_ip(4) + dst_port_be(4)
 		ValueSize: 16, // bytes(8) + pkts(8)
 	}

@@ -47,7 +47,7 @@ struct count_value {
 };
 
 struct {
-  __uint(type, BPF_MAP_TYPE_HASH);
+  __uint(type, BPF_MAP_TYPE_PERCPU_HASH);
   __type(key, struct traffic_direction);
   __type(value, struct count_value);
   __uint(map_flags, BPF_F_NO_PREALLOC);
@@ -80,6 +80,9 @@ static __always_inline __be32 remap_ipv4(__be32 ipaddr) {
 
 // Check if the packet should be captured based on the configuration
 static __always_inline bool capture(__u32 index) {
+  if (index >= 65536) {
+    return false;  // Index out of bounds
+  }
   __u8* capture = bpf_map_lookup_elem(&capture_cfg, &index);
   if (NULL == capture) {
     return false;

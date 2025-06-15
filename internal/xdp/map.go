@@ -41,6 +41,7 @@ type Map struct {
 func (m *Map) IterEntry() iter.Seq2[[]byte, []byte] {
 	return func(yield func([]byte, []byte) bool) {
 		miter := m.m.Iterate()
+
 		key := make([]byte, int(m.m.KeySize()))
 		value := make([]byte, int(m.m.ValueSize()))
 
@@ -52,6 +53,30 @@ func (m *Map) IterEntry() iter.Seq2[[]byte, []byte] {
 
 		if err := miter.Err(); err != nil {
 			log.Printf("map iteration error: %v", err)
+		}
+	}
+}
+
+func (m *Map) IterEntryPerCPU() iter.Seq2[[]byte, []byte] {
+	return func(yield func([]byte, []byte) bool) {
+		miter := m.m.Iterate()
+
+		key := make([]byte, int(m.m.KeySize()))
+		values := make([][]byte, ebpf.MustPossibleCPU())
+		for i := range values {
+			values[i] = make([]byte, int(m.m.ValueSize()))
+		}
+
+		for miter.Next(&key, &values) {
+			for _, value := range values {
+				if !yield(key, value) {
+					return
+				}
+			}
+		}
+
+		if err := miter.Err(); err != nil {
+			log.Printf("map iteration per CPU error: %v", err)
 		}
 	}
 }
@@ -108,7 +133,7 @@ func ReadMergeMap[K comparable, V any, A Adder[V]](
 	valueParser Parser[A],
 ) (map[K]V, error) {
 	result := make(map[K]V)
-	for key, value := range m.IterEntry() {
+	for key, value := range m.IterEntryPerCPU() {
 		key := keyParser.Parse(key)
 		result[key] = valueParser.Parse(value).Add(result[key])
 	}

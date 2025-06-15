@@ -76,7 +76,7 @@ func main() {
 	defer x.Close()
 
 	if err := x.Attach(); err != nil {
-		log.Fatalf("Failed to attach XDP program: %v", err)
+		log.Panicf("Failed to attach XDP program: %v", err)
 	}
 
 	// Start Prometheus metrics server
@@ -87,6 +87,6 @@ func main() {
 
 	log.Printf("Starting Prometheus metrics server on %s", metricsAddr)
 	if err := prom.StartMetricsServer(metricsAddr, x); err != nil {
-		log.Fatalf("Failed to start metrics server: %v", err)
+		log.Panicf("Failed to start metrics server: %v", err)
 	}
 }

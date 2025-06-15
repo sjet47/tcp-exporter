@@ -69,6 +69,22 @@ func (x *XDP) Close() {
 }
 
 func (x *XDP) loadConfigMap(cfg *conf.Conf) error {
+	var err error
+	x.remapMap, err = remapSpec.WithMap(x.obj.RemapCfg)
+	if err != nil {
+		return fmt.Errorf("check remap map error: %v", err)
+	}
+
+	x.captureMap, err = captureSpec.WithMap(x.obj.CaptureCfg)
+	if err != nil {
+		return fmt.Errorf("check capture map error: %v", err)
+	}
+
+	x.statsMap, err = statsSpec.WithMap(x.obj.TrafficStats)
+	if err != nil {
+		return fmt.Errorf("check traffic_stats map error: %v", err)
+	}
+
 	for addr, cidrs := range cfg.Mapping {
 		ip := net.ParseIP(addr)
 		if ip == nil {
@@ -105,11 +121,6 @@ func Load(prog io.ReaderAt, cfg *conf.Conf) (*XDP, error) {
 		return nil, fmt.Errorf("load xdp program error :%v", err)
 	}
 
-	obj := new(xdpObj)
-	if err := spec.LoadAndAssign(obj, nil); err != nil {
-		return nil, fmt.Errorf("load and assign xdp object error: %v", err)
-	}
-
 	var flag link.XDPAttachFlags
 	switch cfg.LoadMode {
 	case LoadModeGeneric:
@@ -122,19 +133,9 @@ func Load(prog io.ReaderAt, cfg *conf.Conf) (*XDP, error) {
 		flag = 0
 	}
 
-	remapMap, err := remapSpec.WithMap(obj.RemapCfg)
-	if err != nil {
-		return nil, fmt.Errorf("check remap map error: %v", err)
-	}
-
-	captureMap, err := captureSpec.WithMap(obj.CaptureCfg)
-	if err != nil {
-		return nil, fmt.Errorf("check capture map error: %v", err)
-	}
-
-	statsMap, err := statsSpec.WithMap(obj.TrafficStats)
-	if err != nil {
-		return nil, fmt.Errorf("check traffic_stats map error: %v", err)
+	obj := new(xdpObj)
+	if err := spec.LoadAndAssign(obj, nil); err != nil {
+		return nil, fmt.Errorf("load and assign xdp object error: %v", err)
 	}
 
 	return &XDP{
@@ -146,9 +147,5 @@ func Load(prog io.ReaderAt, cfg *conf.Conf) (*XDP, error) {
 			Interface: iface.Index,
 			Flags:     flag,
 		},
-
-		remapMap:   remapMap,
-		captureMap: captureMap,
-		statsMap:   statsMap,
 	}, nil
 }

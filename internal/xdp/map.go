@@ -6,6 +6,7 @@ import (
 	"iter"
 	"log"
 	"net"
+	"sync"
 
 	"github.com/cilium/ebpf"
 )
@@ -30,23 +31,31 @@ func (ms *MapSpec) WithMap(m *ebpf.Map) (*Map, error) {
 	}
 
 	return &Map{
-		m: m,
+		m:                 m,
+		keyBuffer:         make([]byte, ms.KeySize),
+		valueBuffer:       make([]byte, ms.ValueSize),
+		valueBufferPerCPU: makeBufSlice(ebpf.MustPossibleCPU(), int(ms.ValueSize)),
 	}, nil
 }
 
 type Map struct {
 	m *ebpf.Map
+
+	mu                sync.Mutex
+	keyBuffer         []byte
+	valueBuffer       []byte
+	valueBufferPerCPU [][]byte
 }
 
+// IterEntry yields reused key and value buffers for each entry in the map.
 func (m *Map) IterEntry() iter.Seq2[[]byte, []byte] {
 	return func(yield func([]byte, []byte) bool) {
 		miter := m.m.Iterate()
 
-		key := make([]byte, int(m.m.KeySize()))
-		value := make([]byte, int(m.m.ValueSize()))
-
-		for miter.Next(&key, &value) {
-			if !yield(key, value) {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		for miter.Next(&m.keyBuffer, &m.valueBuffer) {
+			if !yield(m.keyBuffer, m.valueBuffer) {
 				return
 			}
 		}
@@ -57,19 +66,16 @@ func (m *Map) IterEntry() iter.Seq2[[]byte, []byte] {
 	}
 }
 
+// IterEntryPerCPU yields reused key and value buffers for each entry in the map.
 func (m *Map) IterEntryPerCPU() iter.Seq2[[]byte, []byte] {
 	return func(yield func([]byte, []byte) bool) {
 		miter := m.m.Iterate()
 
-		key := make([]byte, int(m.m.KeySize()))
-		values := make([][]byte, ebpf.MustPossibleCPU())
-		for i := range values {
-			values[i] = make([]byte, int(m.m.ValueSize()))
-		}
-
-		for miter.Next(&key, &values) {
-			for _, value := range values {
-				if !yield(key, value) {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		for miter.Next(&m.keyBuffer, &m.valueBufferPerCPU) {
+			for _, value := range m.valueBufferPerCPU {
+				if !yield(m.keyBuffer, value) {
 					return
 				}
 			}
@@ -157,4 +163,16 @@ func cidrToTrieKey(cidr string) ([]byte, error) {
 
 	return append(binary.NativeEndian.AppendUint32(make([]byte, 0, 4+bitLen/8),
 		uint32(prefixLen)), ip...), nil
+}
+
+func makeBufSlice(bufs, size int) [][]byte {
+	if bufs <= 0 || size <= 0 {
+		return nil
+	}
+
+	slice := make([][]byte, bufs)
+	for i := range slice {
+		slice[i] = make([]byte, size)
+	}
+	return slice
 }

@@ -60,8 +60,8 @@ static __always_inline void count_pkt(const struct traffic_direction* key,
   void* map = &traffic_stats;
   struct count_value* cnt = bpf_map_lookup_elem(map, key);
   if (NULL != cnt) {
-    cnt->bytes += value;
-    cnt->pkts++;
+    __sync_fetch_and_add(&cnt->bytes, value);
+    __sync_fetch_and_add(&cnt->pkts, 1);
   } else {
     struct count_value count = {.bytes = value, .pkts = 1};
     bpf_map_update_elem(map, key, &count, BPF_NOEXIST);

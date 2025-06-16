@@ -79,7 +79,7 @@ static __always_inline void count_pkt(const struct traffic_direction* key,
 
 // Remap IPv4 address using the remap configuration
 static __always_inline __be32 remap_ipv4(__be32 ipaddr) {
-  struct ipv4_cidr_key key = {.prefix_len = 32, .addr = ipaddr};
+  struct ipv4_cidr_key key = {.prefix_len = 24, .addr = ipaddr};
   __u32* remapped_ip = bpf_map_lookup_elem(&ipv4_remap_cfg, &key);
   if (NULL == remapped_ip) {
     return ipaddr;  // No remapping found, return original IP

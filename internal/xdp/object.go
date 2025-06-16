@@ -11,6 +11,7 @@ import (
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
+	"github.com/cilium/ebpf/rlimit"
 )
 
 const (
@@ -111,6 +112,8 @@ func (x *XDP) loadConfigMap(cfg *conf.Conf) error {
 }
 
 func Load(prog io.ReaderAt, cfg *conf.Conf) (*XDP, error) {
+	rlimit.RemoveMemlock()
+
 	iface, err := net.InterfaceByName(cfg.NIC)
 	if err != nil {
 		return nil, fmt.Errorf("get nic name %q error: %v", cfg.NIC, err)

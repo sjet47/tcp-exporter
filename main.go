@@ -16,9 +16,10 @@ import (
 )
 
 var (
-	configPath  string
-	genConfig   bool
-	showVersion bool
+	configPath    string
+	kernalVersion string
+	genConfig     bool
+	showVersion   bool
 )
 
 func init() {
@@ -26,13 +27,14 @@ func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	flag.StringVar(&configPath, "c", "", "yaml configuration file path")
+	flag.StringVar(&kernalVersion, "kernel", "5.15", "kernel version to use for XDP program (default: 5.15)")
 	flag.BoolVar(&genConfig, "gen", false, "generate default configuration file")
 	flag.BoolVar(&showVersion, "v", false, "print version information and exit")
 }
 
 //go:generate make CFLAGS='-DPER_CPU' -C ./xdp tcptrace.o
-//go:embed xdp/tcptrace.o
-var tcptraceProg []byte
+//go:embed xdp/tcptrace_5.15.o
+var tcptraceProg_5_15 []byte
 
 //go:embed version
 var version string
@@ -69,7 +71,15 @@ func main() {
 		log.Fatalf("Failed to parse config: %v", err)
 	}
 
-	x, err := xdp.Load(bytes.NewReader(tcptraceProg), cfg)
+	var prog []byte
+	switch kernalVersion {
+	case "5.15":
+		prog = tcptraceProg_5_15
+	default:
+		log.Fatalf("Unsupported kernel version: %s", kernalVersion)
+	}
+
+	x, err := xdp.Load(bytes.NewReader(prog), cfg)
 	if err != nil {
 		log.Fatalf("Failed to load XDP program: %v", err)
 	}

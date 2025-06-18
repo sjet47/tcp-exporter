@@ -1,5 +1,13 @@
 // clang-format off
-#include "vmlinux.h"
+#ifdef KERNEL_VERSION_6_15
+#include "6.15/vmlinux.h"
+#elif KERNEL_VERSION_5_15
+#include "5.15/vmlinux.h"
+#elif KERNEL_VERSION_5_5
+#include "5.5/vmlinux.h"
+#else
+#error "Kernel version not supported, please use a kernel >= 5.5 or provide a vmlinux.h"
+#endif
 #include "if_ether.h"
 #include <bpf/bpf_endian.h>
 #include <bpf/bpf_helpers.h>

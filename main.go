@@ -32,8 +32,12 @@ func init() {
 	flag.BoolVar(&showVersion, "v", false, "print version information and exit")
 }
 
-//go:generate make CFLAGS='-DPER_CPU' -C ./xdp tcptrace.o
-//go:embed xdp/tcptrace_5.15.o
+//go:generate make CFLAGS='-DPER_CPU' -C ./xdp tcptrace.o.6.15
+//go:embed xdp/6.15/tcptrace.o
+var tcptraceProg_6_15 []byte
+
+//go:generate make CFLAGS='-DPER_CPU' -C ./xdp tcptrace.o.5.15
+//go:embed xdp/5.15/tcptrace.o
 var tcptraceProg_5_15 []byte
 
 //go:embed version
@@ -73,6 +77,8 @@ func main() {
 
 	var prog []byte
 	switch kernalVersion {
+	case "6.15":
+		prog = tcptraceProg_6_15
 	case "5.15":
 		prog = tcptraceProg_5_15
 	default:
